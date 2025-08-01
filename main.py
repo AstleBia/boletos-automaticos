@@ -1,152 +1,157 @@
+# ==============================================================================
+# SCRIPT FINAL DE AUTOMAÇÃO ACADWEB - VERSÃO PROCESSADOR DE LOTES
+# ==============================================================================
+
 import time
 import pyperclip
 import os
 from pywinauto.application import Application
 
+# --- CONFIGURAÇÕES ---
+# 1. COLOQUE AQUI TODAS AS MATRÍCULAS QUE VOCÊ QUER PROCESSAR
+LISTA_MATRICULAS = [
+    "123456-7",
+    "987654-3",
+    "112233-4",
+    # Adicione quantas matrículas quiser, separadas por vírgula
+]
 
-codigo_matricula_a_pesquisar = "6673"  # Matrícula para teste
-diretorio_para_salvar = r"C:\boletos"
+# 2. DEFINA A PASTA ONDE OS ARQUIVOS SERÃO SALVOS
+DIRETORIO_PARA_SALVAR = r"C:\boletos"
 
-if not os.path.exists(diretorio_para_salvar):
+# ==============================================================================
+
+def processar_uma_matricula(app, janela_principal, matricula):
+    """
+    Executa todo o fluxo de automação para uma única matrícula.
+    Retorna True se bem-sucedido, False se ocorrer um erro.
+    """
     try:
-        os.makedirs(diretorio_para_salvar)
-        print(f"Diretório '{diretorio_para_salvar}' criado com sucesso.")
+        print("-" * 50)
+        print(f"INICIANDO PROCESSAMENTO DA MATRÍCULA: {matricula}")
+
+        # --- AÇÃO 2: PESQUISAR A MATRÍCULA ---
+        janela_principal.child_window(auto_id=2105474, control_type="Edit").set_text(matricula).type_keys("{ENTER}")
+        print(f"[{matricula}] Pesquisa realizada.")
+
+        # --- AÇÃO 3: CLICAR COM O BOTÃO DIREITO NO ALUNO ---
+        resultado_aluno = janela_principal.child_window(auto_id=2951858)
+        resultado_aluno.wait('visible ready', timeout=10)
+        resultado_aluno.right_click_input()
+        print(f"[{matricula}] Clique direito no aluno.")
+
+        # --- AÇÃO 4: COPIAR NOME E SALVAR EM VARIÁVEL ---
+        app.PopupMenu.menu_select("Copiar célula")
+        time.sleep(0.5)
+        valor_copiado = pyperclip.paste().strip()
+        print(f"[{matricula}] Valor copiado: '{valor_copiado}'")
+
+        # --- AÇÃO 5: NAVEGAR PARA O FINANCEIRO ---
+        janela_principal.child_window(title="Financeiro").click_input()
+        time.sleep(2)
+        print(f"[{matricula}] Navegou para a área Financeiro.")
+
+        # --- AÇÃO 6: SELECIONAR TODOS OS DÉBITOS ---
+        painel_financeiro = janela_principal.child_window(auto_id=22808452)
+        painel_financeiro.wait('visible ready', timeout=10)
+        painel_financeiro.right_click_input()
+        time.sleep(1)
+        app.PopupMenu.child_window(title="Selecionar Todos os Débitos", auto_id=400).click_input()
+        print(f"[{matricula}] Débitos selecionados.")
+        time.sleep(1)
+        
+        # --- AÇÃO 7: IMPRIMIR BOLETOS ---
+        painel_financeiro.right_click_input()
+        time.sleep(1)
+        app.PopupMenu.child_window(title="Imprimir Boletos Selecionados", auto_id=394).click_input()
+        print(f"[{matricula}] Comando de impressão enviado.")
+
+        # --- AÇÃO 8: EXPORTAR RELATÓRIO ---
+        janela_relatorio = app.window(title="Visualização do relatório", class_name="TFRM_PreviewCrystal")
+        janela_relatorio.wait('visible ready', timeout=40)
+        janela_relatorio.set_focus()
+        janela_relatorio.child_window(child_id=9, control_type="Button").click_input()
+        print(f"[{matricula}] Botão de exportar clicado.")
+
+        # --- AÇÃO 9: CONFIRMAR EXPORTAÇÃO ---
+        janela_export_dialog = app.window(title="Export")
+        janela_export_dialog.wait('visible ready', timeout=10)
+        janela_export_dialog.child_window(title="OK", control_type="Button").click_input()
+        print(f"[{matricula}] Confirmação de exportação OK.")
+
+        # --- AÇÃO 10: SALVAR O ARQUIVO ---
+        janela_salvar = app.window(title="Salvar como", class_name="#32770")
+        janela_salvar.wait('visible ready', timeout=15)
+        nome_limpo = "".join(c for c in valor_copiado if c.isalnum() or c in " ._-").rstrip()
+        # Nome de arquivo mais robusto, incluindo a matrícula
+        nome_arquivo = f"boleto_{matricula}_{nome_limpo}.pdf"
+        caminho_completo = os.path.join(DIRETORIO_PARA_SALVAR, nome_arquivo)
+        janela_salvar.child_window(title="Nome:", control_type="Edit").set_edit_text(caminho_completo)
+        janela_salvar.child_window(title="Salvar", auto_id="1", control_type="Button").click_input()
+        print(f"[{matricula}] Arquivo salvo em: {caminho_completo}")
+        time.sleep(3)
+
+        # --- AÇÃO 11: RESETAR A INTERFACE PARA O PRÓXIMO CICLO ---
+        print(f"[{matricula}] Resetando a interface...")
+        # 1. Fecha a janela de relatório
+        if janela_relatorio.exists():
+            janela_relatorio.close()
+            print(f"[{matricula}] Janela de relatório fechada.")
+        
+        # 2. Clica na aba "Aluno" para voltar ao início
+        aba_aluno = janela_principal.child_window(title="Aluno", child_id=1, control_type="TabItem")
+        aba_aluno.click_input()
+        print(f"[{matricula}] Voltou para a aba Aluno.")
+        time.sleep(2) # Pausa para garantir que a aba carregou
+
+        return True
+
     except Exception as e:
-        print(
-            f"ERRO CRÍTICO: Não foi possível criar o diretório '{diretorio_para_salvar}'. Verifique as permissões. Detalhes: {e}")
+        print(f"!!!! ERRO AO PROCESSAR A MATRÍCULA {matricula} !!!!")
+        print(f"Detalhes: {e}")
+        # Tenta resetar a interface mesmo em caso de erro
+        try:
+            if app.window(title="Visualização do relatório").exists():
+                app.window(title="Visualização do relatório").close()
+            janela_principal.child_window(title="Aluno", child_id=1, control_type="TabItem").click_input()
+        except Exception as reset_e:
+            print(f"Falha ao tentar resetar a interface após o erro: {reset_e}")
+        return False
+
+
+# --- BLOCO PRINCIPAL DE EXECUÇÃO ---
+if __name__ == "__main__":
+    if not os.path.exists(DIRETORIO_PARA_SALVAR):
+        try:
+            os.makedirs(DIRETORIO_PARA_SALVAR)
+            print(f"Diretório '{DIRETORIO_PARA_SALVAR}' criado com sucesso.")
+        except Exception as e:
+            print(f"ERRO CRÍTICO: Não foi possível criar o diretório. Verifique as permissões. Detalhes: {e}")
+            exit()
+            
+    print("Iniciando Robô de Processamento em Lote...")
+    try:
+        app = Application(backend="uia").connect(path="AcadwebCursos.exe")
+        janela_principal = app.window(title_re="^Acadweb Cursos.*")
+        janela_principal.wait('visible ready', timeout=30)
+        janela_principal.set_focus()
+        print("Conexão com a aplicação estabelecida.")
+    except Exception as e:
+        print(f"ERRO CRÍTICO: Não foi possível conectar à aplicação. Verifique se ela está aberta. Detalhes: {e}")
         exit()
 
-print("Conectando à aplicação 'AcadwebCursos.exe' que já está aberta...")
-try:
-    app = Application(backend="uia").connect(path="AcadwebCursos.exe")
-    janela_principal = app.window(title_re="^Acadweb Cursos.*")
-    janela_principal.wait('visible ready', timeout=30)
-    janela_principal.set_focus()
-    print("Conexão e janela principal OK.")
-except Exception as e:
-    print(f"ERRO CRÍTICO: Não foi possível conectar à aplicação. Verifique se ela está aberta. Detalhes: {e}")
-    exit()
+    sucessos = 0
+    falhas = 0
 
-print(f"Pesquisando a matrícula: {codigo_matricula_a_pesquisar}")
-try:
-    barra_pesquisa = janela_principal.child_window(auto_id=2105474, control_type="Edit")
-    barra_pesquisa.set_edit_text(codigo_matricula_a_pesquisar).type_keys("{ENTER}")
-    print("Pesquisa realizada.")
-except Exception as e:
-    print(f"ERRO na Ação 2 (Pesquisar Matrícula). Detalhes: {e}")
-    exit()
-
-print("Clicando com o botão direito no resultado do aluno...")
-try:
-    resultado_aluno = janela_principal.child_window(auto_id=2951858)
-    resultado_aluno.wait('visible ready', timeout=10)
-    resultado_aluno.right_click_input()
-    print("Clique direito executado.")
-except Exception as e:
-    print(f"ERRO na Ação 3 (Clique Direito). Detalhes: {e}")
-    exit()
-
-print("Copiando o nome da célula...")
-try:
-    app.PopupMenu.menu_select("Copiar célula")
-    time.sleep(0.5)
-    valor_copiado = pyperclip.paste().strip()
-    print(f"--- VALOR COPIADO: '{valor_copiado}' ---")
-except Exception as e:
-    print(f"ERRO na Ação 4 (Copiar Célula). Detalhes: {e}")
-    exit()
-
-print("Navegando para a área 'Financeiro'...")
-try:
-    janela_principal.child_window(title="Financeiro").click_input()
-    time.sleep(2)
-    print("Área 'Financeiro' selecionada.")
-except Exception as e:
-    print(f"ERRO na Ação 5 (Navegar Financeiro). Detalhes: {e}")
-    exit()
-
-print("Selecionando todos os débitos...")
-try:
-    painel_financeiro = janela_principal.child_window(auto_id=22808452)
-    painel_financeiro.wait('visible ready', timeout=10)
-    painel_financeiro.right_click_input()
-    time.sleep(1)
-    app.PopupMenu.child_window(title="Selecionar Todos os Débitos", auto_id=400).click_input()
-    print("Débitos selecionados.")
-    time.sleep(1)
-except Exception as e:
-    print(f"ERRO na Ação 6 (Selecionar Débitos). Detalhes: {e}")
-    exit()
-
-print("Enviando comando para imprimir boletos...")
-try:
-    janela_principal.child_window(auto_id=22808452).right_click_input()
-    time.sleep(1)
-    app.PopupMenu.child_window(title="Imprimir Boletos Selecionados", auto_id=394).click_input()
-    print("Comando de impressão enviado.")
-except Exception as e:
-    print(f"ERRO na Ação 7 (Imprimir Boletos). Detalhes: {e}")
-    exit()
-
-
-print("Aguardando janela de relatório e clicando em exportar...")
-try:
-    janela_relatorio = app.window(title="Visualização do relatório", class_name="TFRM_PreviewCrystal")
-    janela_relatorio.wait('visible ready', timeout=40)
-    janela_relatorio.set_focus()
-    janela_relatorio.child_window(child_id=9, control_type="Button").click_input()
-    print("Botão de exportar clicado.")
-except Exception as e:
-    print(f"ERRO na Ação 8 (Exportar Relatório). Detalhes: {e}")
-    exit()
-
-
-print("Confirmando exportação...")
-try:
-    janela_export_dialog = app.window(title="Export")
-    janela_export_dialog.wait('visible ready', timeout=10)
-    janela_export_dialog.child_window(title="OK", control_type="Button").click_input()
-    print("Confirmação OK.")
-except Exception as e:
-    print(f"ERRO na Ação 9 (Confirmar Export). Detalhes: {e}")
-    exit()
-
-
-print("Salvando o arquivo final...")
-try:
-    # Usa os valores padrão para a janela "Salvar como". Se falhar aqui, verifique estes valores com o Inspect.exe
-    janela_salvar = app.window(title="Salvar como", class_name="#32770")
-    janela_salvar.wait('visible ready', timeout=15)
-    print("Janela 'Salvar como' encontrada.")
-
-    # Cria um nome de arquivo limpo a partir do valor copiado (ex: "boleto_Fulano_de_Tal.pdf")
-    nome_limpo = "".join(c for c in valor_copiado if c.isalnum() or c in " ._-").rstrip()
-    nome_arquivo = f"boleto_{nome_limpo}.pdf"
-
-    # Junta o diretório e o nome do arquivo para formar o caminho completo
-    caminho_completo = os.path.join(diretorio_para_salvar, nome_arquivo)
-    print(f"Salvando arquivo em: {caminho_completo}")
-
-    # Insere o caminho completo no campo de nome de arquivo
-    # Usando valores padrão para o campo "Nome:". Se falhar, verifique com Inspect.exe
-    campo_nome_arquivo = janela_salvar.child_window(title="Nome:", control_type="Edit")
-    campo_nome_arquivo.set_edit_text(caminho_completo)
-
-    # Clica no botão "Salvar" usando o AutomationId que você forneceu
-    botao_salvar = janela_salvar.child_window(title="Salvar", auto_id="1", control_type="Button")
-    botao_salvar.click_input()
-    print("Botão 'Salvar' clicado.")
-
-    # Pausa final para garantir que o arquivo foi salvo antes de terminar
-    time.sleep(3)
-
-except Exception as e:
-    print(f"ERRO na Ação 10 (Salvar Arquivo).")
-    print("Verifique os identificadores da janela 'Salvar como', do campo 'Nome:' e do botão 'Salvar'.")
-    print(f"Detalhes do erro: {e}")
-    exit()
-
-print("\n==============================================")
-print("ROBÔ FINALIZADO COM SUCESSO!")
-print(f"O arquivo deve ter sido salvo em '{diretorio_para_salvar}'.")
-print("==============================================")
+    for matricula_atual in LISTA_MATRICULAS:
+        if processar_uma_matricula(app, janela_principal, matricula_atual):
+            sucessos += 1
+        else:
+            falhas += 1
+    
+    print("\n" + "="*50)
+    print("PROCESSAMENTO FINALIZADO!")
+    print(f"Total de matrículas processadas: {len(LISTA_MATRICULAS)}")
+    print(f"  - Sucessos: {sucessos}")
+    print(f"  - Falhas: {falhas}")
+    print("="*50)
