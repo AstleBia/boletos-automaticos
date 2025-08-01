@@ -10,9 +10,12 @@ from pywinauto.application import Application
 # --- CONFIGURAÇÕES ---
 # 1. COLOQUE AQUI TODAS AS MATRÍCULAS QUE VOCÊ QUER PROCESSAR
 LISTA_MATRICULAS = [
-    "123456-7",
-    "987654-3",
-    "112233-4",
+    "6673",
+    "6672",
+    "6671",
+    "6670",
+    "6669",
+    "6668"
     # Adicione quantas matrículas quiser, separadas por vírgula
 ]
 
