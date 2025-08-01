@@ -1,5 +1,5 @@
 # ==============================================================================
-# SCRIPT FINAL DE AUTOMAÇÃO ACADWEB - VERSÃO PROCESSADOR DE LOTES
+# SCRIPT FINAL DE AUTOMAÇÃO ACADWEB - VERSÃO PROCESSADOR DE LOTES (v1.1 - Corrigido)
 # ==============================================================================
 
 import time
@@ -8,18 +8,15 @@ import os
 from pywinauto.application import Application
 
 # --- CONFIGURAÇÕES ---
-# 1. COLOQUE AQUI TODAS AS MATRÍCULAS QUE VOCÊ QUER PROCESSAR
 LISTA_MATRICULAS = [
     "6673",
     "6672",
     "6671",
     "6670",
     "6669",
-    "6668"
-    # Adicione quantas matrículas quiser, separadas por vírgula
+    "6668",
+    "6667",
 ]
-
-# 2. DEFINA A PASTA ONDE OS ARQUIVOS SERÃO SALVOS
 DIRETORIO_PARA_SALVAR = r"C:\boletos"
 
 # ==============================================================================
@@ -33,28 +30,31 @@ def processar_uma_matricula(app, janela_principal, matricula):
         print("-" * 50)
         print(f"INICIANDO PROCESSAMENTO DA MATRÍCULA: {matricula}")
 
-        # --- AÇÃO 2: PESQUISAR A MATRÍCULA ---
+        # --- AÇÕES 2 a 10 ---
+        # (A lógica principal permanece a mesma)
+        
+        # Ação 2: Pesquisar
         janela_principal.child_window(auto_id=2105474, control_type="Edit").set_text(matricula).type_keys("{ENTER}")
         print(f"[{matricula}] Pesquisa realizada.")
 
-        # --- AÇÃO 3: CLICAR COM O BOTÃO DIREITO NO ALUNO ---
+        # Ação 3: Clique Direito
         resultado_aluno = janela_principal.child_window(auto_id=2951858)
         resultado_aluno.wait('visible ready', timeout=10)
         resultado_aluno.right_click_input()
         print(f"[{matricula}] Clique direito no aluno.")
 
-        # --- AÇÃO 4: COPIAR NOME E SALVAR EM VARIÁVEL ---
+        # Ação 4: Copiar Célula
         app.PopupMenu.menu_select("Copiar célula")
         time.sleep(0.5)
         valor_copiado = pyperclip.paste().strip()
         print(f"[{matricula}] Valor copiado: '{valor_copiado}'")
 
-        # --- AÇÃO 5: NAVEGAR PARA O FINANCEIRO ---
+        # Ação 5: Navegar Financeiro
         janela_principal.child_window(title="Financeiro").click_input()
         time.sleep(2)
         print(f"[{matricula}] Navegou para a área Financeiro.")
 
-        # --- AÇÃO 6: SELECIONAR TODOS OS DÉBITOS ---
+        # Ação 6: Selecionar Débitos
         painel_financeiro = janela_principal.child_window(auto_id=22808452)
         painel_financeiro.wait('visible ready', timeout=10)
         painel_financeiro.right_click_input()
@@ -63,30 +63,29 @@ def processar_uma_matricula(app, janela_principal, matricula):
         print(f"[{matricula}] Débitos selecionados.")
         time.sleep(1)
         
-        # --- AÇÃO 7: IMPRIMIR BOLETOS ---
+        # Ação 7: Imprimir Boletos
         painel_financeiro.right_click_input()
         time.sleep(1)
         app.PopupMenu.child_window(title="Imprimir Boletos Selecionados", auto_id=394).click_input()
         print(f"[{matricula}] Comando de impressão enviado.")
 
-        # --- AÇÃO 8: EXPORTAR RELATÓRIO ---
+        # Ação 8: Exportar Relatório
         janela_relatorio = app.window(title="Visualização do relatório", class_name="TFRM_PreviewCrystal")
         janela_relatorio.wait('visible ready', timeout=40)
         janela_relatorio.set_focus()
         janela_relatorio.child_window(child_id=9, control_type="Button").click_input()
         print(f"[{matricula}] Botão de exportar clicado.")
 
-        # --- AÇÃO 9: CONFIRMAR EXPORTAÇÃO ---
+        # Ação 9: Confirmar Exportação
         janela_export_dialog = app.window(title="Export")
         janela_export_dialog.wait('visible ready', timeout=10)
         janela_export_dialog.child_window(title="OK", control_type="Button").click_input()
         print(f"[{matricula}] Confirmação de exportação OK.")
 
-        # --- AÇÃO 10: SALVAR O ARQUIVO ---
+        # Ação 10: Salvar Arquivo
         janela_salvar = app.window(title="Salvar como", class_name="#32770")
         janela_salvar.wait('visible ready', timeout=15)
         nome_limpo = "".join(c for c in valor_copiado if c.isalnum() or c in " ._-").rstrip()
-        # Nome de arquivo mais robusto, incluindo a matrícula
         nome_arquivo = f"boleto_{matricula}_{nome_limpo}.pdf"
         caminho_completo = os.path.join(DIRETORIO_PARA_SALVAR, nome_arquivo)
         janela_salvar.child_window(title="Nome:", control_type="Edit").set_edit_text(caminho_completo)
@@ -94,31 +93,41 @@ def processar_uma_matricula(app, janela_principal, matricula):
         print(f"[{matricula}] Arquivo salvo em: {caminho_completo}")
         time.sleep(3)
 
-        # --- AÇÃO 11: RESETAR A INTERFACE PARA O PRÓXIMO CICLO ---
+        # --- AÇÃO 11: RESETAR A INTERFACE ---
         print(f"[{matricula}] Resetando a interface...")
-        # 1. Fecha a janela de relatório
         if janela_relatorio.exists():
             janela_relatorio.close()
             print(f"[{matricula}] Janela de relatório fechada.")
         
-        # 2. Clica na aba "Aluno" para voltar ao início
-        aba_aluno = janela_principal.child_window(title="Aluno", child_id=1, control_type="TabItem")
+        # ***** LINHA CORRIGIDA *****
+        aba_aluno = janela_principal.children(title="Aluno", control_type="TabItem")[0]
         aba_aluno.click_input()
         print(f"[{matricula}] Voltou para a aba Aluno.")
-        time.sleep(2) # Pausa para garantir que a aba carregou
+        time.sleep(2)
 
         return True
 
     except Exception as e:
         print(f"!!!! ERRO AO PROCESSAR A MATRÍCULA {matricula} !!!!")
-        print(f"Detalhes: {e}")
-        # Tenta resetar a interface mesmo em caso de erro
+        print(f"O erro original foi: {e}")
+        
+        print("--- Tentando resetar a interface após o erro... ---")
         try:
+            # Tenta fechar janelas extras que possam ter ficado abertas
+            if app.window(title="Salvar como").exists():
+                app.window(title="Salvar como").close()
             if app.window(title="Visualização do relatório").exists():
                 app.window(title="Visualização do relatório").close()
-            janela_principal.child_window(title="Aluno", child_id=1, control_type="TabItem").click_input()
+
+            # ***** LINHA CORRIGIDA *****
+            aba_aluno = janela_principal.children(title="Aluno", control_type="TabItem")[0]
+            aba_aluno.click_input()
+            print("--- Interface resetada com sucesso. Tentando próxima matrícula. ---")
         except Exception as reset_e:
-            print(f"Falha ao tentar resetar a interface após o erro: {reset_e}")
+            print(f"!!!! FALHA CRÍTICA AO TENTAR RESETAR A INTERFACE !!!!")
+            print(f"Não foi possível continuar a automação. Erro do reset: {reset_e}")
+            # Em caso de falha no reset, é mais seguro parar o robô
+            raise InterruptedError("Não foi possível resetar a UI para continuar.") from reset_e
         return False
 
 
@@ -129,7 +138,7 @@ if __name__ == "__main__":
             os.makedirs(DIRETORIO_PARA_SALVAR)
             print(f"Diretório '{DIRETORIO_PARA_SALVAR}' criado com sucesso.")
         except Exception as e:
-            print(f"ERRO CRÍTICO: Não foi possível criar o diretório. Verifique as permissões. Detalhes: {e}")
+            print(f"ERRO CRÍTICO: Não foi possível criar o diretório. Detalhes: {e}")
             exit()
             
     print("Iniciando Robô de Processamento em Lote...")
@@ -154,7 +163,7 @@ if __name__ == "__main__":
     
     print("\n" + "="*50)
     print("PROCESSAMENTO FINALIZADO!")
-    print(f"Total de matrículas processadas: {len(LISTA_MATRICULAS)}")
+    print(f"Total de matrículas na lista: {len(LISTA_MATRICULAS)}")
     print(f"  - Sucessos: {sucessos}")
     print(f"  - Falhas: {falhas}")
     print("="*50)
