@@ -4,7 +4,7 @@ import os
 from pywinauto.application import Application
 
 
-codigo_matricula_a_pesquisar = "123456-7"  # Matrícula para teste
+codigo_matricula_a_pesquisar = "6673"  # Matrícula para teste
 diretorio_para_salvar = r"C:\boletos"
 
 if not os.path.exists(diretorio_para_salvar):
